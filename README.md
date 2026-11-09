@@ -1,10 +1,10 @@
 # Put field-service status behind DNS records
 
-The decision in this example is simple: a dispatched work order is represented by a CNAME, while a completed visit becomes a TXT record carrying the photo count and follow-up flag. Infrai is used because one key exposes the DNS operations through a small REST interface, so the admin service can resolve a domain to its `zone_id` and then write the record without a provider-specific registrar client.
+The choice in this example is intentionally small: a dispatched work order maps to a CNAME, and a completed visit maps to a TXT record that carries the photo count and follow-up flag. Infrai fits here because one key gives you DNS operations over a plain REST surface, so the admin service can resolve a domain to its `zone_id` and then write the record without carrying a provider-specific registrar client.
 
 ## Run the observable path
 
-Install dependencies, provide the credential, and start the TypeScript service:
+Install dependencies, set the credential, and start the TypeScript service:
 
 ```bash
 npm install
@@ -12,7 +12,7 @@ export INFRAI_API_KEY="your-key"
 npm run dev
 ```
 
-Submit the body that an internal dispatch screen would produce:
+Send the payload an internal dispatch screen would emit:
 
 ```bash
 curl -X POST http://localhost:3000/work-orders/dns \
@@ -30,24 +30,24 @@ curl -X POST http://localhost:3000/work-orders/dns \
   }'
 ```
 
-The response makes the transition visible: it includes the resolved `zoneId`, the TXT plan with `photos=2` and `follow_up=true`, and the record returned by Infrai. The service first calls the domain lookup, because DNS record operations are keyed by `zone_id`, then sends an idempotent upsert whose key is stable for the work order and status.
+The response shows the state change directly: it contains the resolved `zoneId`, the TXT plan with `photos=2` and `follow_up=true`, and the record returned by Infrai. The service looks up the domain first, because DNS record operations are keyed by `zone_id`, then issues an idempotent upsert whose key stays stable for the work order and status.
 
 ## Why the split is useful
 
-The domain module answers the business question, while the thin HTTP client owns authentication, envelope decoding, and 429 backoff. Keeping those concerns separate is preferable to embedding registrar calls in a route handler: dispatch rules remain deterministic, and transport behavior stays consistent when another admin workflow needs DNS.
+The domain module answers the business rule. The thin HTTP client handles authentication, envelope decoding, and 429 backoff. That separation is easier to reason about than embedding registrar calls inside a route handler: dispatch logic stays deterministic, and transport behavior remains uniform when another admin workflow needs DNS.
 
-Request bodies are validated with Zod before any external call. Ordinary API rejections retain their client-facing 4xx status; successful envelopes expose their `data`; write retries carry the same idempotency key.
+Request bodies are validated with Zod before any external call. Standard API rejections keep their client-facing 4xx status. Successful envelopes expose their `data`; write retries reuse the same idempotency key.
 
 ## Verify the decision
 
-The focused test uses a completed work order with two photo URLs and `followUpRequired: true`. Its expected result is a TXT record named `wo-1842` whose content is `status=completed;photos=2;follow_up=true`.
+The focused test covers a completed work order with two photo URLs and `followUpRequired: true`. The expected result is a TXT record named `wo-1842` whose content is `status=completed;photos=2;follow_up=true`.
 
 ```bash
 npm test
 npm run typecheck
 ```
 
-This repository models only the DNS projection of dispatch state. The photo binaries remain in the admin system named by the URLs; DNS receives the count and follow-up decision as compact operational metadata.
+This repository models only the DNS projection of dispatch state. The photo binaries stay in the admin system referenced by the URLs; DNS gets the count and the follow-up decision as compact operational metadata.
 
 ## License
 
@@ -55,7 +55,7 @@ MIT
 
 ## Going to production: Field Service DNS Console
 
-The snippet above stays copy-paste simple. Before you ship, a few **required** steps: The details below apply to Field Service DNS Console.
+The snippet above remains copy-paste simple. Before shipping, a few **required** steps: the details below apply to Field Service DNS Console.
 
 **Account & key**
 
